@@ -1,0 +1,16 @@
+Package: ggtranslate
+Title: A 'ggplot2' Extension for Translating Plot Text
+Version: 0.1.0
+Author: Mathias Leroy <mathias.leroy.rpkg@gmail.com>
+Maintainer: Mathias Leroy <mathias.leroy.rpkg@gmail.com>
+Description: Provides a simple way to translate text elements in 'ggplot2' plots using a dictionary-based approach.
+License: MIT + file LICENSE
+Encoding: UTF-8
+RoxygenNote: 7.3.1
+URL: https://github.com/mathiasleroy/ggtranslate
+BugReports: https://github.com/mathiasleroy/ggtranslate/issues
+Imports:
+    ggplot2,
+    rlang
+Suggests:
+    testthat (>= 3.0.0)
