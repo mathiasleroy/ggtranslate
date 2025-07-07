@@ -23,6 +23,7 @@ The core functionality is provided by the `ggtranslate()` function. You supply a
 
 ```r
 library(ggplot2)
+library(ggtranslate)
 
 # Sample data
 df <- data.frame(
