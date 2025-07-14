@@ -32,20 +32,15 @@
 #' @importFrom stats setNames
 #' @export
 ggtranslate <- function(plot, dictionary_list) {
-  # Create a dictionary df
+  # Create a true deep copy of the plot to avoid modifying the original object
+  plot <- unserialize(serialize(plot, NULL))
+
+  # Create a dictionary df with 2 columns
   dictionary <- data.frame(
     stringsAsFactors = FALSE,
     original = names(dictionary_list),
     translation = unlist(dictionary_list, use.names = FALSE)
   )
-
-  # Create a true deep copy of the plot to avoid modifying the original object
-  plot <- unserialize(serialize(plot, NULL))
-
-  # Ensure dictionary has the correct columns
-  if (!all(c("original", "translation") %in% names(dictionary))) {
-    stop("Dictionary must have 'original' and 'translation' columns.")
-  }
 
   # Create a named vector for easy lookup
   lookup <- setNames(dictionary$translation, dictionary$original)
@@ -59,13 +54,14 @@ ggtranslate <- function(plot, dictionary_list) {
   built_plot <- ggplot_build(plot)
   plot <- built_plot$plot
 
-  # 1. Translate main plot labels
+
+  ## 1. Translate main plot labels
   plot$labels <- lapply(plot$labels, function(label) {
     if (is.character(label)) translate_vector(label) else label
   })
 
 
-  # 2. Translate scales (axes and legends)
+  ## 2. Translate scales (axes and legends)
   for (i in seq_along(plot$scales$scales)) {
     scale <- plot$scales$scales[[i]]
     if (inherits(scale, "ScaleDiscrete")) {
@@ -90,7 +86,7 @@ ggtranslate <- function(plot, dictionary_list) {
     plot$scales$scales[[i]] <- scale
   }
 
-  # 3. Translate facet labels
+  ## 3. Translate facet labels
   if (!is.null(plot$facet) && inherits(plot$facet, "Facet")) {
     if (!is.null(plot$facet$params$labeller)) {
       original_labeller <- plot$facet$params$labeller
@@ -105,79 +101,69 @@ ggtranslate <- function(plot, dictionary_list) {
   }
 
 
-  # 4. Tranlate data ## -> CHANGING plot$data BREAKS WHOLE PLOT
-  # if (!is.null(plot$data)) {
-  #   print(plot$data)
-  #   for (col in names(plot$data)) {
-  #     if (is.character(plot$data[[col]])) {
-  #       plot$data[[col]] <- translate_vector(plot$data[[col]]) ## DOESNT WORK, BREAKS PLOT
-  ## -> changing plot$data breaks the whole plot
-  #     }
+  ## Tranlate data (doesnt work)
+  # for (col in names(plot$data)) {
+  #   if (is.character(plot$data[[col]])) {
+  #     plot$data[[col]] <- translate_vector(plot$data[[col]]) ## DOESNT WORK, BREAKS PLOT
   #   }
-  #   print(plot$data)
   # }
+  ## -> modifying plot$data breaks the whole plot in several ways
 
-  # 4. Translate text in geoms (geom_text, geom_label)
-  # --> DOESNT WORK YET
+
+  ## 4. Translate text in geoms (geom_text, geom_label)
   for (i in seq_along(plot$layers)) {
     layer <- plot$layers[[i]]
     if (inherits(layer$geom, "GeomText") || inherits(layer$geom, "GeomLabel")) {
       if (!is.null(layer$aes_params$label)) {
-        # a) Translate static labels
-        layer$aes_params$label <- translate_vector(layer$aes_params$label) ## WORKS WELL!
+        # a) Translate static labels (e.g. geom_text(label='static'))
+        layer$aes_params$label <- translate_vector(layer$aes_params$label)
       } else {
-        # b) Translate aesthetic-mapped labels
-
+        # b) Translate aesthetic-mapped labels (e.g. geom_text(aes(label=column)))
         label_var_name <- ""
 
-        if ("label" %in% names(layer$mapping)) {
+        if ("label" %in% names(layer$mapping)) { ## this happens when aes is direclty defined: e.g. geom_text(aes(label=column))
+          # in this case we will replace this value with a new column name which has translated values.
           label_var_name <- rlang::as_name(layer$mapping$label)
-          # label_expr <- rlang::get_expr(layer$mapping$label)
-          # if (!is.symbol(label_expr)) {
-          #   warning(paste("ggtranslate does not support translating complex label expressions:", rlang::expr_text(label_expr)))
-          #   next
-          # }
-          # label_var_name <- as.character(label_expr)
-        } else if ("label" %in% names(layer$computed_mapping)) {
-          ## in this case we will overwrite $mapping which is currently NULL
-          # This is an unwanted change in the plot, it wont be identical anymore.
-          # but we cant change
-          # layer$computed_mapping$label <- rlang::sym(new_col_name)
-          # because computed_mapping is rewritten each time we plot(), the value wont last
+        } else if ("label" %in% names(layer$computed_mapping)) { ## this happens when aes is indireclty defined: e.g. ggplot(aes(label=column)) + geom_text(aes())
+          # in this case we will insert a new layer$mapping, (value should be NULL)
+          # this is not ideal, would be better to change the plot object as little as possible.
+          # but this solution works.
+          # we cannot change layer$computed_mapping (e.g. layer$computed_mapping$label <- rlang::sym(new_col_name))
+          # because this value is overwritten each time we plot.
           label_var_name <- rlang::as_name(layer$computed_mapping$label)
         }
 
-        # computed_mapping
         if (label_var_name != "") {
-          # label_var_name <- rlang::as_name(layer$mapping$label) ## name of variable assigned to text/label
-
-          # message("\n\n------ aes-mapped labels:")
-
-          newdata <- if (!is.null(layer$data) && !inherits(layer$data, "waiver")) layer$data else plot$data
-          # newdata <- plot$data
+          # find if the data is in the layer or the plot
+          is_data_layer <- !is.null(layer$data) && !inherits(layer$data, "waiver")
+          newdata <- if (layer_or_data) layer$data else plot$data
 
           if (!is.null(newdata) && label_var_name %in% names(newdata)) {
+            ## add a column
             new_col_name <- paste0(label_var_name, "_translated")
-
-            ## add column
             if (!new_col_name %in% names(newdata)) newdata[[new_col_name]] <- translate_vector(newdata[[label_var_name]])
 
-            # Assign the modified data back to the correct place
-            if (!is.null(layer$data) && !inherits(layer$data, "waiver")) {
+            # replace the modified data back to the correct place
+            if (is_data_layer) {
               layer$data <- newdata
             } else {
               plot$data <- newdata
             }
 
             # Update the aesthetic mapping to use the new translated column
+            # note: layer$computed_mapping cannot be changed, its rewritten all the time
             layer$mapping$label <- rlang::sym(new_col_name)
-            # computed_mapping cannot be changed, its rewritten all the time
           }
         }
       }
     }
     plot$layers[[i]] <- layer
   }
+
+
+  ## todo
+  # - factors ?
+
 
   plot
 }
