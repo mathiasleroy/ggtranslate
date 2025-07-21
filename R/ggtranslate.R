@@ -56,7 +56,7 @@ ggtranslate <- function(plot, dictionary_list) {
 
 
   ## 1. Translate main plot labels
-  plot$labels <- lapply(plot$labels, function(label) {
+  plot$labels[] <- lapply(plot$labels, function(label) {
     if (is.character(label)) translate_vector(label) else label
   })
 
