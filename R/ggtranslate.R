@@ -100,16 +100,6 @@ ggtranslate <- function(plot, dictionary_list) {
     }
   }
 
-
-  ## Tranlate data (doesnt work)
-  # for (col in names(plot$data)) {
-  #   if (is.character(plot$data[[col]])) {
-  #     plot$data[[col]] <- translate_vector(plot$data[[col]]) ## DOESNT WORK, BREAKS PLOT
-  #   }
-  # }
-  ## -> modifying plot$data breaks the whole plot in several ways
-
-
   ## 4. Translate text in geoms (geom_text, geom_label)
   for (i in seq_along(plot$layers)) {
     layer <- plot$layers[[i]]
@@ -121,39 +111,71 @@ ggtranslate <- function(plot, dictionary_list) {
         # b) Translate aesthetic-mapped labels (e.g. geom_text(aes(label=column)))
         label_var_name <- ""
 
+        # find if the data is in the layer or the plot / FALSE if plot
+        is_data_in_layer <- !is.null(layer$data) && !inherits(layer$data, "waiver")
+
         if ("label" %in% names(layer$mapping)) { ## this happens when aes is direclty defined: e.g. geom_text(aes(label=column))
-          # in this case we will replace this value with a new column name which has translated values.
-          label_var_name <- rlang::as_name(layer$mapping$label)
+          # --> we will replace this mapping with a new column
+          mapping_or_computed <- "mapping"
         } else if ("label" %in% names(layer$computed_mapping)) { ## this happens when aes is indireclty defined: e.g. ggplot(aes(label=column)) + geom_text(aes())
-          # in this case we will insert a new layer$mapping, (value should be NULL)
-          # this is not ideal, would be better to change the plot object as little as possible.
-          # but this solution works.
-          # we cannot change layer$computed_mapping (e.g. layer$computed_mapping$label <- rlang::sym(new_col_name))
-          # because this value is overwritten each time we plot.
-          label_var_name <- rlang::as_name(layer$computed_mapping$label)
+          # --> we will replace layer$mapping with a new column
+          # (we cannot change layer$computed_mapping, its overwritten)
+          mapping_or_computed <- "computed_mapping"
         }
 
-        if (label_var_name != "") {
-          # find if the data is in the layer or the plot
-          is_data_layer <- !is.null(layer$data) && !inherits(layer$data, "waiver")
-          newdata <- if (is_data_layer) layer$data else plot$data
+        label_quosure <- layer[[mapping_or_computed]]$label
+        label_expr <- rlang::quo_get_expr(label_quosure)
+        label_var_name <- NULL # Initialize to NULL
+        if (rlang::is_symbol(label_expr)) {
+          # If the label is a simple symbol (e.g., `var_name`), get its name
+          # e.g.  > layer[[mapping_or_computed]]
+          label_var_name <- rlang::as_name(label_expr)
+        } else if (rlang::is_call(label_expr)) {
+          # If the label is an expression (e.g., `abs(count)` or `paste(name1, name2)`)
+          # e.g. `label` -> `abs(count)`
+          # e.g. `label` -> `paste(name1, name2, sep = " - ")`
 
-          if (!is.null(newdata) && label_var_name %in% names(newdata)) {
-            ## add a column
-            new_col_name <- paste0(label_var_name, "_translated")
-            if (!new_col_name %in% names(newdata)) newdata[[new_col_name]] <- translate_vector(newdata[[label_var_name]])
+          ## add new column
+          # label_var_name <- paste0(".ggtranslate_label_temp_", digest::digest(label_expr)) ## avoid library
+          label_var_name <- paste(deparse(label_expr, width.cutoff = 500L), collapse = "")
 
-            # replace the modified data back to the correct place
-            if (is_data_layer) {
-              layer$data <- newdata
-            } else {
-              plot$data <- newdata
-            }
-
-            # Update the aesthetic mapping to use the new translated column
-            # note: layer$computed_mapping cannot be changed, its rewritten all the time
-            layer$mapping$label <- rlang::sym(new_col_name)
+          if (is_data_in_layer) {
+            layer$data <- layer$data %>%
+              dplyr::mutate(!!rlang::sym(label_var_name) := !!label_quosure)
+          } else {
+            plot$data <- plot$data %>%
+              dplyr::mutate(!!rlang::sym(label_var_name) := !!label_quosure)
           }
+        }
+
+        if (is.null(label_var_name)) next
+        if (label_var_name == "") next
+
+        ## find data type
+        label_var_type <- ifelse(is_data_in_layer,
+          class(layer$data[[label_var_name]]),
+          class(plot$data[[label_var_name]])
+        )
+        if (label_var_type == "numeric") next ## dont translate numeric
+
+        # Create new data frame for adding translation column
+        newdata <- if (is_data_in_layer) layer$data else plot$data
+
+        if (!is.null(newdata) && label_var_name %in% names(newdata)) {
+          ## add a column
+          new_col_name <- paste0(label_var_name, "_translated")
+          if (!new_col_name %in% names(newdata)) newdata[[new_col_name]] <- translate_vector(newdata[[label_var_name]])
+
+          # replace the modified data back to the correct place
+          if (is_data_in_layer) {
+            layer$data <- newdata
+          } else {
+            plot$data <- newdata
+          }
+
+          # Update the aesthetic mapping
+          # note: layer$computed_mapping cannot be changed, its overwritten
+          layer$mapping$label <- rlang::sym(new_col_name)
         }
       }
     }
