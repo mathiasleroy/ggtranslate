@@ -136,7 +136,7 @@ ggtranslate <- function(plot, dictionary_list) {
         if (label_var_name != "") {
           # find if the data is in the layer or the plot
           is_data_layer <- !is.null(layer$data) && !inherits(layer$data, "waiver")
-          newdata <- if (layer_or_data) layer$data else plot$data
+          newdata <- if (is_data_layer) layer$data else plot$data
 
           if (!is.null(newdata) && label_var_name %in% names(newdata)) {
             ## add a column
