@@ -3,9 +3,15 @@ library(ggplot2)
 # library(ggtranslate)
 
 test_that("ggtranslate correctly translates plot titles, labels, and captions", {
-  p <- ggplot(data.frame(x = 1, y = 1), aes(x, y)) +
+  p_en <- ggplot(data.frame(x = 1, y = 1), aes(x, y)) +
     geom_point() +
-    labs(title = "My Title", subtitle = "My Subtitle", caption = "My Caption", x = "X Axis", y = "Y Axis")
+    labs(
+      title = "My Title",
+      subtitle = "My Subtitle",
+      caption = "My Caption",
+      x = "X Axis",
+      y = "Y Axis"
+    )
 
   dict <- list(
     "My Title" = "Mon Titre",
@@ -15,7 +21,7 @@ test_that("ggtranslate correctly translates plot titles, labels, and captions", 
     "Y Axis" = "Axe Y"
   )
 
-  p_fr <- ggtranslate(p, dict)
+  p_fr <- ggtranslate(p_en, dict)
 
   expect_equal(p_fr$labels$title, "Mon Titre")
   expect_equal(p_fr$labels$subtitle, "Mon Sous-titre")
@@ -24,22 +30,19 @@ test_that("ggtranslate correctly translates plot titles, labels, and captions", 
   expect_equal(p_fr$labels$y, "Axe Y")
 })
 
-# plot = p
-# dictionary = dict
 
 test_that("ggtranslate correctly translates discrete scale labels", {
   df <- data.frame(x = c("One", "Two"), y = c(1, 2))
-  p <- ggplot(df, aes(x, y, color = x)) +
+  p_en <- ggplot(df, aes(x, y, color = x)) +
     geom_point()
 
   dict <- list(
     "One" = "Un",
     "Two" = "Deux"
   )
-  p_fr <- ggtranslate(p, dict)
+  p_fr <- ggtranslate(p_en, dict)
 
   # Check x-axis scale
-  # x_labels <- p_fr$scales$get_scales("x")$get_labels() ## doesnt work
   x_labels <- ggplot_build(p_fr)$layout$panel_scales_x[[1]]$get_labels()
   expect_equal(x_labels, c("Un", "Deux"))
 
@@ -50,13 +53,13 @@ test_that("ggtranslate correctly translates discrete scale labels", {
 
 test_that("ggtranslate correctly translates facet labels", {
   df <- data.frame(x = c("One", "Two"), y = c(1, 2), facet = c("Facet 1", "Facet 2"))
-  p <- ggplot(df, aes(x, y)) +
+  p_en <- ggplot(df, aes(x, y)) +
     geom_point() +
     facet_wrap(~facet)
 
   dict <- list("Facet 1" = "Facette 1", "Facet 2" = "Facette 2")
 
-  p_fr <- ggtranslate(p, dict)
+  p_fr <- ggtranslate(p_en, dict)
 
   # Check the labeller function
   labeller <- p_fr$facet$params$labeller
@@ -76,13 +79,49 @@ test_that("ggtranslate correctly translates geom_text and geom_label labels", {
 
   dict <- list("aaaaa" = "ccc", "bbbbb" = "ddd")
   p_fr <- ggtranslate(p_en, dict)
-  # plot(p_fr)
 
   ## check all layers
   for (lll in p_fr$layer) {
     mapped_var <- lll$mapping$label ## we dont change computed_mapping
     mapped_var <- ifelse(is.null(mapped_var), "", mapped_var |> rlang::as_name())
-    # print(mapped_var)
     expect_equal(p_fr$data[[mapped_var]], c("ccc", "ddd"))
   }
 })
+
+
+## TEST NUMERIC TEXT/LABELS
+test_that("ggtranslate doesn't translate numeric labels", {
+  df <- data.frame(name = c("One", "Two"), count = c(1, 2))
+  p_en <- ggplot(df, aes(x = name, y = count, label = count)) +
+    geom_text(aes(label = count)) +
+    geom_label(vjust = 2)
+
+  dict <- list("One" = "Un", "Two" = "Deux")
+  p_fr <- ggtranslate(p_en, dict)
+
+  expect_equal(length(names(p_fr$data)), 2)
+  expect_true(!"count_translated" %in% names(p_fr$data))
+})
+
+
+## TEST FORMULA TEXT/LABELS
+test_that("ggtranslate doesn't translate numeric labels", {
+  df <- data.frame(name1 = c("One", "Two"), name2 = c("Three", "Four"), count = c(1, 2))
+  p_en <- ggplot(df, aes(x = name1, y = count, label = paste(name1, name2, sep = " - "))) +
+    geom_text(aes(label = paste(name1, name2, sep = " - "))) +
+    geom_label(vjust = 2)
+
+  dict <- list("One - Three" = "Un - Trois", "Two - Four" = "Deux - Quatre")
+  p_fr <- ggtranslate(p_en, dict)
+
+  ## check all layers
+  for (lll in p_fr$layer) {
+    mapped_var <- lll$mapping$label ## we dont change computed_mapping
+    mapped_var <- ifelse(is.null(mapped_var), "", mapped_var |> rlang::as_name())
+    expect_equal(p_fr$data[[mapped_var]], c("Un - Trois", "Deux - Quatre"))
+  }
+})
+
+
+## TEST TEXT/LABELS WORKS WHEN BRINGS ITS OWN DATA
+# geom_label(data = data_labels, aes(label = label))
