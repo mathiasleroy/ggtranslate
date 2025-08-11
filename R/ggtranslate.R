@@ -6,7 +6,7 @@
 #' discrete legend keys, facet labels, and text from `geom_text`/`geom_label`.
 #'
 #' @param plot A ggplot object whose text elements are to be translated.
-#' @param dictionary_list A named list where the names are the original text and the values are the translated text.
+#' @param dictionary_list A named list (or named character vector) where the names are the original text and the values are the translated text.
 #' @return A modified ggplot object with all translatable text elements replaced
 #'   according to the provided dictionary list.
 #' @examples
@@ -35,20 +35,37 @@ ggtranslate <- function(plot, dictionary_list) {
   # Create a true deep copy of the plot to avoid modifying the original object
   plot <- unserialize(serialize(plot, NULL))
 
+  ## TRANSFORM TO NAMED CHARACTER VECTOR
+  ## accepts named list or named character vector
   # Create a dictionary df with 2 columns
-  dictionary <- data.frame(
-    stringsAsFactors = FALSE,
-    original = names(dictionary_list),
-    translation = unlist(dictionary_list, use.names = FALSE)
-  )
+  # dictionary <- data.frame(
+  #   stringsAsFactors = FALSE,
+  #   original = names(dictionary_list),
+  #   translation = unlist(dictionary_list, use.names = FALSE)
+  # )
+  # # Create a named vector for easy lookup
+  # lookup <- setNames(dictionary$translation, dictionary$original)
+  lookup <- setNames(unlist(dictionary_list, use.names = FALSE), names(dictionary_list))
 
-  # Create a named vector for easy lookup
-  lookup <- setNames(dictionary$translation, dictionary$original)
-
-  # Helper function to translate a vector of text
-  translate_vector <- function(vec) {
-    sapply(as.character(vec), function(t) ifelse(t %in% names(lookup), lookup[t], t), USE.NAMES = FALSE)
+  # Helper function to translate bits within a string
+  translate_string <- function(text) {
+    for (orig in names(lookup)) {
+      text <- gsub(orig, lookup[orig], text, fixed = TRUE)
+    }
+    text
   }
+
+  # Helper function to vectorize translate_string
+  translate_vector <- function(vec) {
+    sapply(as.character(vec), translate_string, USE.NAMES = FALSE)
+  }
+
+  # this version will only translate exact complete strings in the dictionary
+  # there might be a need later to toggle this behavior on  or off
+  # translate_vector <- function(vec) {
+  #   sapply(as.character(vec), function(t) ifelse(t %in% names(lookup), lookup[t], t), USE.NAMES = FALSE)
+  # }
+
 
   # Build the plot to ensure all scales and components are populated
   built_plot <- ggplot_build(plot)
