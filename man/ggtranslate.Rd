@@ -9,7 +9,7 @@ ggtranslate(plot, dictionary_list)
 \arguments{
 \item{plot}{A ggplot object whose text elements are to be translated.}
 
-\item{dictionary_list}{A named list where the names are the original text and the values are the translated text.}
+\item{dictionary_list}{A named list (or named character vector) where the names are the original text and the values are the translated text.}
 }
 \value{
 A modified ggplot object with all translatable text elements replaced

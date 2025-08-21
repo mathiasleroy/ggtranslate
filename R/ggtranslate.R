@@ -19,6 +19,8 @@
 #' translation_fr <- list(
 #'   "Monday" = "Lundi",
 #'   "Tuesday" = "Mardi",
+#'   "day" = "jour",
+#'   "value" = "valeur",
 #'   "Weekly Report" = "Rapport Hebdomadaire"
 #' )
 #' p_en <- ggplot(df, aes(x = day, y = value)) +
@@ -28,9 +30,10 @@
 #' \dontshow{
 #' print(p_fr)
 #' }
-#' @import ggplot2 rlang
+#' @importFrom ggplot2 ggplot_build as_labeller
+#' @importFrom rlang quo_get_expr is_symbol as_name is_call sym eval_tidy
 #' @importFrom stats setNames
-#' @export
+#' @export4
 ggtranslate <- function(plot, dictionary_list) {
   # Create a true deep copy of the plot to avoid modifying the original object
   plot <- unserialize(serialize(plot, NULL))
@@ -43,7 +46,7 @@ ggtranslate <- function(plot, dictionary_list) {
   #   original = names(dictionary_list),
   #   translation = unlist(dictionary_list, use.names = FALSE)
   # )
-  # # Create a named vector for easy lookup
+  # # Create a named vector for a easy lookup
   # lookup <- setNames(dictionary$translation, dictionary$original)
   lookup <- setNames(unlist(dictionary_list, use.names = FALSE), names(dictionary_list))
 
@@ -64,7 +67,7 @@ ggtranslate <- function(plot, dictionary_list) {
   # there might be a need later to toggle this behavior on  or off
   # translate_vector <- function(vec) {
   #   sapply(as.character(vec), function(t) ifelse(t %in% names(lookup), lookup[t], t), USE.NAMES = FALSE)
-  # }
+  # }'''
 
 
   # Build the plot to ensure all scales and components are populated
@@ -157,11 +160,9 @@ ggtranslate <- function(plot, dictionary_list) {
           label_var_name <- paste(deparse(label_expr, width.cutoff = 500L), collapse = "")
 
           if (is_data_in_layer) {
-            layer$data <- layer$data %>%
-              dplyr::mutate(!!rlang::sym(label_var_name) := !!label_quosure)
+            layer$data[[label_var_name]] <- rlang::eval_tidy(label_quosure, layer$data)
           } else {
-            plot$data <- plot$data %>%
-              dplyr::mutate(!!rlang::sym(label_var_name) := !!label_quosure)
+            plot$data[[label_var_name]] <- rlang::eval_tidy(label_quosure, plot$data)
           }
         }
 
