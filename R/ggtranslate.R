@@ -76,9 +76,11 @@ ggtranslate <- function(plot, dictionary_list) {
 
 
   ## 1. Translate main plot labels
-  plot$labels <- lapply(plot$labels, function(label) {
-    if (is.character(label)) translate_vector(label) else label
-  })
+  for (label_name in names(plot$labels)) {
+    if (is.character(plot$labels[[label_name]])) {
+      plot$labels[[label_name]] <- translate_vector(plot$labels[[label_name]])
+    }
+  }
 
 
   ## 2. Translate scales (axes and legends)
