@@ -1,5 +1,5 @@
 *.tar.gz
 
-..Rcheck/
+*.Rcheck/
 
 notes.R
