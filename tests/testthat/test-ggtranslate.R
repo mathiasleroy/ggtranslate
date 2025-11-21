@@ -1,6 +1,6 @@
 library(testthat)
 library(ggplot2)
-# library(ggtranslate)
+source("R/ggtranslate.R")
 
 test_that("ggtranslate correctly translates plot titles, labels, and captions", {
   p_en <- ggplot(data.frame(x = 1, y = 1), aes(x, y)) +
@@ -80,8 +80,10 @@ test_that("ggtranslate correctly translates geom_text and geom_label labels", {
   dict <- list("aaaaa" = "ccc", "bbbbb" = "ddd")
   p_fr <- ggtranslate(p_en, dict)
 
+  expect_false(is.null(p_fr$layers)) #
+
   ## check all layers
-  for (lll in p_fr$layer) {
+  for (lll in p_fr$layers) {
     mapped_var <- lll$mapping$label ## we dont change computed_mapping
     mapped_var <- ifelse(is.null(mapped_var), "", mapped_var |> rlang::as_name())
     expect_equal(p_fr$data[[mapped_var]], c("ccc", "ddd"))
@@ -100,12 +102,13 @@ test_that("ggtranslate doesn't translate numeric labels", {
   p_fr <- ggtranslate(p_en, dict)
 
   expect_equal(length(names(p_fr$data)), 2)
-  expect_true(!"count_translated" %in% names(p_fr$data))
+  ## count_translated is usually a column added by ggtranslate, here we dont want it
+  expect_false("count_translated" %in% names(p_fr$data))
 })
 
 
 ## TEST FORMULA TEXT/LABELS
-test_that("ggtranslate doesn't translate numeric labels", {
+test_that("ggtranslate can translate composite labels", {
   df <- data.frame(name1 = c("One", "Two"), name2 = c("Three", "Four"), count = c(1, 2))
   p_en <- ggplot(df, aes(x = name1, y = count, label = paste(name1, name2, sep = " - "))) +
     geom_text(aes(label = paste(name1, name2, sep = " - "))) +
@@ -113,9 +116,10 @@ test_that("ggtranslate doesn't translate numeric labels", {
 
   dict <- list("One - Three" = "Un - Trois", "Two - Four" = "Deux - Quatre")
   p_fr <- ggtranslate(p_en, dict)
+  expect_false(is.null(p_fr$layers)) #
 
   ## check all layers
-  for (lll in p_fr$layer) {
+  for (lll in p_fr$layers) {
     mapped_var <- lll$mapping$label ## we dont change computed_mapping
     mapped_var <- ifelse(is.null(mapped_var), "", mapped_var |> rlang::as_name())
     expect_equal(p_fr$data[[mapped_var]], c("Un - Trois", "Deux - Quatre"))
