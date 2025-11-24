@@ -2,6 +2,7 @@ library(testthat)
 library(ggplot2)
 source("R/ggtranslate.R")
 
+
 test_that("ggtranslate correctly translates plot titles, labels, and captions", {
   p_en <- ggplot(data.frame(x = 1, y = 1), aes(x, y)) +
     geom_point() +
@@ -127,5 +128,59 @@ test_that("ggtranslate can translate composite labels", {
 })
 
 
-## TEST TEXT/LABELS WORKS WHEN BRINGS ITS OWN DATA
-# geom_label(data = data_labels, aes(label = label))
+test_that("ggtranslate correctly translates new ggplot2 v4.0.0 label attributes, 1st method", {
+  ## taken from https://tidyverse.org/blog/2025/09/ggplot2-4-0-0/#labels
+
+  # The penguins dataset was incorporated into base R 4.5
+  df <- penguins
+
+  # Manually set label attributes.
+  attr(df$species, "label") <- "Penguin Species"
+  attr(df$bill_dep, "label") <- "Bill depth (mm)"
+  attr(df$bill_len, "label") <- "Bill length (mm)"
+  attr(df$body_mass, "label") <- "Body mass (g)"
+
+  p_en <- ggplot(df, aes(bill_dep, bill_len, colour = body_mass)) +
+    geom_point(na.rm = TRUE)
+
+  dict <- list(
+    "Penguin Species" = "Espèces de manchots",
+    "Bill depth (mm)" = "Profondeur du bec (mm)",
+    "Bill length (mm)" = "Longueur du bec (mm)",
+    "Body mass (g)" = "Masse corporelle (g)"
+  )
+  p_fr <- ggtranslate(p_en, dict)
+
+
+  expect_equal(p_fr$labels$x, dict[["Bill depth (mm)"]])
+  expect_equal(p_fr$labels$y, dict[["Bill length (mm)"]])
+  expect_equal(p_fr$labels$colour, dict[["Body mass (g)"]])
+})
+
+test_that("ggtranslate correctly translates new ggplot2 v4.0.0 label attributes, 2nd method", {
+  dict <- tibble::tribble(
+    ~var, ~label,
+    "species", "Penguin Species",
+    "bill_dep", "Bill depth (mm)",
+    "bill_len", "Bill length (mm)",
+    "body_mass", "Body mass (g)"
+  )
+  p_en <- ggplot(penguins, aes(bill_dep, bill_len, colour = body_mass)) +
+    geom_point(na.rm = TRUE) +
+    # Or:
+    # labs(dictionary = dplyr::pull(dict, label, name = var))
+    labs(dictionary = setNames(dict$label, dict$var))
+
+  dict <- list(
+    "Penguin Species" = "Espèces de manchots",
+    "Bill depth (mm)" = "Profondeur du bec (mm)",
+    "Bill length (mm)" = "Longueur du bec (mm)",
+    "Body mass (g)" = "Masse corporelle (g)"
+  )
+  p_fr <- ggtranslate(p_en, dict)
+
+
+  expect_equal(p_fr$labels$x, dict[["Bill depth (mm)"]])
+  expect_equal(p_fr$labels$y, dict[["Bill length (mm)"]])
+  expect_equal(p_fr$labels$colour, dict[["Body mass (g)"]])
+})
