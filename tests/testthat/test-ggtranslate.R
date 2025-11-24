@@ -14,6 +14,7 @@ test_that("ggtranslate correctly translates plot titles, labels, and captions", 
       y = "Y Axis"
     )
 
+  ## translated plot
   dict <- list(
     "My Title" = "Mon Titre",
     "My Subtitle" = "Mon Sous-titre",
@@ -21,9 +22,9 @@ test_that("ggtranslate correctly translates plot titles, labels, and captions", 
     "X Axis" = "Axe X",
     "Y Axis" = "Axe Y"
   )
-
   p_fr <- ggtranslate(p_en, dict)
 
+  ## tests
   expect_equal(p_fr$labels$title, "Mon Titre")
   expect_equal(p_fr$labels$subtitle, "Mon Sous-titre")
   expect_equal(p_fr$labels$caption, "Ma Légende")
@@ -37,6 +38,7 @@ test_that("ggtranslate correctly translates discrete scale labels", {
   p_en <- ggplot(df, aes(x, y, color = x)) +
     geom_point()
 
+  ## translated plot
   dict <- list(
     "One" = "Un",
     "Two" = "Deux"
@@ -58,8 +60,8 @@ test_that("ggtranslate correctly translates facet labels", {
     geom_point() +
     facet_wrap(~facet)
 
+  ## translated plot
   dict <- list("Facet 1" = "Facette 1", "Facet 2" = "Facette 2")
-
   p_fr <- ggtranslate(p_en, dict)
 
   # Check the labeller function
@@ -78,12 +80,12 @@ test_that("ggtranslate correctly translates geom_text and geom_label labels", {
     geom_label(x = 1.5, aes(label = txt)) + ## explicit aes
     geom_text() ## inherited aes
 
+  ## translated plot
   dict <- list("aaaaa" = "ccc", "bbbbb" = "ddd")
   p_fr <- ggtranslate(p_en, dict)
 
+  ## tests
   expect_false(is.null(p_fr$layers)) #
-
-  ## check all layers
   for (lll in p_fr$layers) {
     mapped_var <- lll$mapping$label ## we dont change computed_mapping
     mapped_var <- ifelse(is.null(mapped_var), "", mapped_var |> rlang::as_name())
@@ -99,9 +101,11 @@ test_that("ggtranslate doesn't translate numeric labels", {
     geom_text(aes(label = count)) +
     geom_label(vjust = 2)
 
+  ## translated plot
   dict <- list("One" = "Un", "Two" = "Deux")
   p_fr <- ggtranslate(p_en, dict)
 
+  ## tests
   expect_equal(length(names(p_fr$data)), 2)
   ## count_translated is usually a column added by ggtranslate, here we dont want it
   expect_false("count_translated" %in% names(p_fr$data))
@@ -115,11 +119,12 @@ test_that("ggtranslate can translate composite labels", {
     geom_text(aes(label = paste(name1, name2, sep = " - "))) +
     geom_label(vjust = 2)
 
+  ## translated plot
   dict <- list("One - Three" = "Un - Trois", "Two - Four" = "Deux - Quatre")
   p_fr <- ggtranslate(p_en, dict)
-  expect_false(is.null(p_fr$layers)) #
 
-  ## check all layers
+  ## tests
+  expect_false(is.null(p_fr$layers))
   for (lll in p_fr$layers) {
     mapped_var <- lll$mapping$label ## we dont change computed_mapping
     mapped_var <- ifelse(is.null(mapped_var), "", mapped_var |> rlang::as_name())
@@ -140,9 +145,11 @@ test_that("ggtranslate correctly translates new ggplot2 v4.0.0 label attributes,
   attr(df$bill_len, "label") <- "Bill length (mm)"
   attr(df$body_mass, "label") <- "Body mass (g)"
 
+  ## english plot
   p_en <- ggplot(df, aes(bill_dep, bill_len, colour = body_mass)) +
     geom_point(na.rm = TRUE)
 
+  ## translated plot
   dict <- list(
     "Penguin Species" = "Espèces de manchots",
     "Bill depth (mm)" = "Profondeur du bec (mm)",
@@ -151,7 +158,7 @@ test_that("ggtranslate correctly translates new ggplot2 v4.0.0 label attributes,
   )
   p_fr <- ggtranslate(p_en, dict)
 
-
+  ## tests
   expect_equal(p_fr$labels$x, dict[["Bill depth (mm)"]])
   expect_equal(p_fr$labels$y, dict[["Bill length (mm)"]])
   expect_equal(p_fr$labels$colour, dict[["Body mass (g)"]])
@@ -165,12 +172,15 @@ test_that("ggtranslate correctly translates new ggplot2 v4.0.0 label attributes,
     "bill_len", "Bill length (mm)",
     "body_mass", "Body mass (g)"
   )
+
+  ## english plot
   p_en <- ggplot(penguins, aes(bill_dep, bill_len, colour = body_mass)) +
     geom_point(na.rm = TRUE) +
     # Or:
     # labs(dictionary = dplyr::pull(dict, label, name = var))
     labs(dictionary = setNames(dict$label, dict$var))
 
+  ## translated plot
   dict <- list(
     "Penguin Species" = "Espèces de manchots",
     "Bill depth (mm)" = "Profondeur du bec (mm)",
@@ -179,8 +189,75 @@ test_that("ggtranslate correctly translates new ggplot2 v4.0.0 label attributes,
   )
   p_fr <- ggtranslate(p_en, dict)
 
-
+  ## tests
   expect_equal(p_fr$labels$x, dict[["Bill depth (mm)"]])
   expect_equal(p_fr$labels$y, dict[["Bill length (mm)"]])
   expect_equal(p_fr$labels$colour, dict[["Body mass (g)"]])
+})
+
+
+
+
+test_that("text & labels are translated when they pull from different data", {
+  df <- mtcars[1:5, c("wt", "mpg")]
+  ## make rowname as column
+  df <- data.frame(
+    car = row.names(df), df,
+    row.names = NULL, stringsAsFactors = FALSE
+  )
+
+  ## english plot
+  p_en <- ggplot(df, aes(wt, mpg)) +
+    geom_label(data = df, aes(label = car))
+
+  ## translated plot
+  dict <- list(
+    "Mazda RX4" = "a",
+    "Mazda RX4 Wag" = "b", ## ! contains a name above
+    "Datsun 710" = "c",
+    "Hornet 4 Drive" = "d",
+    "Hornet Sportabout" = "e"
+  )
+  p_fr <- ggtranslate(p_en, dict, mode = "strict") ## also works with 'longfirst', not with 'asordered'
+
+  ## translated plot
+  expect_false(is.null(p_fr$layers))
+  for (lll in p_fr$layers) {
+    mapped_var <- lll$mapping$label ## we dont change computed_mapping
+    mapped_var <- ifelse(is.null(mapped_var), "", mapped_var |> rlang::as_name())
+    # expect_equal(lll$data[[mapped_var]], c("a", "a Wag", "c", "d", "e")) ## mode = 'asordered'
+    expect_equal(lll$data[[mapped_var]], c("a", "b", "c", "d", "e"))
+  }
+
+  ## p_fr$data has not been changed, no car_translated column was added
+  expect_equal(length(names(p_fr$data)), 3)
+})
+
+
+test_that("all 3 modes work as expected", {
+  df <- mtcars[1:2, c("wt", "mpg")]
+  ## make rowname as column
+  df <- data.frame(
+    car = row.names(df), df,
+    row.names = NULL, stringsAsFactors = FALSE
+  )
+
+  ## english plot
+  p_en <- ggplot(df, aes(wt, mpg)) +
+    geom_label(data = df, aes(label = car))
+
+  ## translated plots
+  dict <- list(
+    "Mazda" = "a", ## only partial match
+    "Mazda RX4" = "b" ## both strict and partial match
+    # "Mazda RX4 Wag" = not translated here for testing
+  )
+  p_fr_strict <- ggtranslate(p_en, dict, mode = "strict")
+  p_fr_longfirst <- ggtranslate(p_en, dict, mode = "longfirst")
+  p_fr_asordered <- ggtranslate(p_en, dict, mode = "asordered")
+
+  ## tests
+  expect_equal(p_fr_strict$layers[[1]]$data[["car_translated"]], c("b", "Mazda RX4 Wag"))
+  expect_equal(p_fr_longfirst$layers[[1]]$data[["car_translated"]], c("b", "b Wag"))
+  expect_equal(p_fr_asordered$layers[[1]]$data[["car_translated"]], c("a RX4", "a RX4 Wag"))
 })

@@ -1,6 +1,6 @@
 Package: ggtranslate
 Title: A 'ggplot2' Extension for Translating Plot Text
-Version: 0.1.1
+Version: 0.1.2
 Author: Mathias Leroy [aut, cre]
 Authors@R: person(given = "Mathias",
                     family = "Leroy",

@@ -7,8 +7,13 @@
 #'
 #' @param plot A ggplot object whose text elements are to be translated.
 #' @param dictionary_list A named list (or named character vector) where the names are the original text and the values are the translated text.
+#' @param mode Translation mode:
+#'   `"strict"` (default, exact match only),
+#'   `"longfirst"` (partial replacement, longest key first), or
+#'   `"asordered"` (partial replacement, as ordered in the dict).
 #' @return A modified ggplot object with all translatable text elements replaced
 #'   according to the provided dictionary list.
+#'
 #' @examples
 #' library(ggplot2)
 #'
@@ -33,21 +38,21 @@
 #' @importFrom ggplot2 ggplot_build as_labeller
 #' @importFrom rlang quo_get_expr is_symbol as_name is_call sym eval_tidy
 #' @importFrom stats setNames
-#' @export4
-ggtranslate <- function(plot, dictionary_list) {
-  # Create a true deep copy of the plot to avoid modifying the original object
-  plot <- unserialize(serialize(plot, NULL))
+#' @export
+ggtranslate <- function(plot,
+                        dictionary_list,
+                        mode = "strict" # "strict", "longfirst", "asordered"
+) {
+  # order dicionay by  longest keys first (avoids str matches within strings)
+  reorder_by_key_length <- function(x, decreasing = TRUE) {
+    if (is.null(names(x))) stop("Input must be a named list")
+    x[order(nchar(names(x)), decreasing = decreasing)]
+  }
+  if (mode == "longfirst") {
+    dictionary_list <- reorder_by_key_length(dictionary_list)
+  }
 
-  ## TRANSFORM TO NAMED CHARACTER VECTOR
-  ## accepts named list or named character vector
-  # Create a dictionary df with 2 columns
-  # dictionary <- data.frame(
-  #   stringsAsFactors = FALSE,
-  #   original = names(dictionary_list),
-  #   translation = unlist(dictionary_list, use.names = FALSE)
-  # )
-  # # Create a named vector for a easy lookup
-  # lookup <- setNames(dictionary$translation, dictionary$original)
+  # transform to named character vector
   lookup <- setNames(unlist(dictionary_list, use.names = FALSE), names(dictionary_list))
 
   # Helper function to translate bits within a string
@@ -59,16 +64,21 @@ ggtranslate <- function(plot, dictionary_list) {
   }
 
   # Helper function to vectorize translate_string
-  translate_vector <- function(vec) {
-    sapply(as.character(vec), translate_string, USE.NAMES = FALSE)
+  if (mode %in% c("longfirst", "asordered")) {
+    # partial replacements, as ordered in lookup
+    translate_vector <- function(vec) {
+      sapply(as.character(vec), translate_string, USE.NAMES = FALSE)
+    }
+  } else { # mode == "strict" (or any non-valid mode)
+    # this version will only translate exact complete strings in the dictionary
+    translate_vector <- function(vec) {
+      sapply(as.character(vec), function(t) ifelse(t %in% names(lookup), lookup[t], t), USE.NAMES = FALSE)
+    }
   }
 
-  # this version will only translate exact complete strings in the dictionary
-  # there might be a need later to toggle this behavior on  or off
-  # translate_vector <- function(vec) {
-  #   sapply(as.character(vec), function(t) ifelse(t %in% names(lookup), lookup[t], t), USE.NAMES = FALSE)
-  # }'''
 
+  # Create a true deep copy of the plot to avoid modifying the original object
+  plot <- unserialize(serialize(plot, NULL))
 
   # Build the plot to ensure all scales and components are populated
   built_plot <- ggplot_build(plot)
