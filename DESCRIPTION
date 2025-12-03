@@ -9,7 +9,7 @@ Authors@R: person(given = "Mathias",
 Maintainer: Mathias Leroy <mathias.leroy.rpkg@gmail.com>
 Description: Provides a simple way to translate text elements in 'ggplot2' plots using a dictionary-based approach.
 Encoding: UTF-8
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
 URL: https://github.com/mathiasleroy/ggtranslate
 BugReports: https://github.com/mathiasleroy/ggtranslate/issues
 Imports:

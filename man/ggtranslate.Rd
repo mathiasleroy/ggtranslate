@@ -4,12 +4,17 @@
 \alias{ggtranslate}
 \title{Translate all text elements in a ggplot2 object}
 \usage{
-ggtranslate(plot, dictionary_list)
+ggtranslate(plot, dictionary_list, mode = "strict")
 }
 \arguments{
 \item{plot}{A ggplot object whose text elements are to be translated.}
 
 \item{dictionary_list}{A named list (or named character vector) where the names are the original text and the values are the translated text.}
+
+\item{mode}{Translation mode:
+`"strict"` (default, exact match only),
+`"longfirst"` (partial replacement, longest key first), or
+`"asordered"` (partial replacement, as ordered in the dict).}
 }
 \value{
 A modified ggplot object with all translatable text elements replaced
@@ -31,6 +36,8 @@ df <- data.frame(
 translation_fr <- list(
   "Monday" = "Lundi",
   "Tuesday" = "Mardi",
+  "day" = "jour",
+  "value" = "valeur",
   "Weekly Report" = "Rapport Hebdomadaire"
 )
 p_en <- ggplot(df, aes(x = day, y = value)) +
